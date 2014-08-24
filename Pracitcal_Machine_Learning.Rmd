@@ -6,18 +6,16 @@ output: html_document
 ---
 
 #Task-Description
-In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset). 
+In this project, my goal was to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset). 
 The aim is to predict the outcome of "classe"-variable with the given variables in the training-dataset.
 
-#Index:
-1. Getting Data
-2. Data Exploration
-
 #Dataset-Description
-The dataset that as downloaded on 08th of August 2014 from the following link: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv> describes weight lifting exercises from 6 people. The Dataset contains 19622 observations of 160 variables where the last feature "classes" is an indicator how correct the exercise was done.
+The dataset that was downloaded on 24th of August 2014 from the following link: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv> describes weight lifting exercises from 6 people. The Dataset contains 19622 observations of 160 variables where the last feature "classes" is an indicator how correct the exercise was done.
 
 The variables in the dataset consists on different datatypes as factors, numerical and integer values. The ranges of the last types are in a negative through a postive range with a lot of NA values.
 
+#Getting the Data
+The data was accessed on 24th of August at 17:45 GMT+1 since the given 20 test-cases are for the submission only I will only show how I get the training-data.
 
 ```{r 1. Download the Datasets}
 library(RCurl)
@@ -33,26 +31,35 @@ raw_dataset <- read.csv(text = website)
 url_test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
 website <- getURL(url_test)
 test <- read.csv(text = website)
-
-#converting columns in testdata
-for(i in seq_along(test[,5:159])) {
-  test[,i] <- as.numeric(test[,i])
-}
 ```
+
+#Viewing the Data
+I started to view the data which I downloaded yet. There are no freaky column-names to clean but a lot of empty rows in a lot of variables.
 
 ```{r 2. Data Exploring}
 dim(raw_dataset)
 colnames(raw_dataset)
 summary(raw_dataset)
-str(raw_dataset)
+#str(raw_dataset)
 head(raw_dataset)
 ```
 
+#Cleaning the data
+Because when viewing the data I recognised different data-types for the columns so what I did was converting them to numeric data to get proper NAN and / or NA values for the later steps. I also excluded the first 8 variables of the data set, because it were only meta-data for the study and or for the person which made the exercise so it had not really a lot to do with the measured data.
+What I finally get is a tidy dataset with 53 variables (where the classe variable is included).
+
 ```{r exclude mostly NA columns}
+
 # convert columns to get correct NA values
 for(i in seq_along(raw_dataset[,5:159])) {
   raw_dataset[,i] <- as.numeric(raw_dataset[,i])
 }
+
+#converting columns in testdata
+for(i in seq_along(test[,5:159])) {
+  test[,i] <- as.numeric(test[,i])
+}
+
 y <- NULL
 for(i in seq_along(test)) {
   y <- c(y,sum(is.na(test[,i])) > 0)
@@ -66,14 +73,20 @@ temp_test <- test[, !y]
 data <- temp[, 8:60]
 data_test <- temp_test[, 8:60]
 ```
-library(caret)
+
+# Splitting the training data into train and test-set
+Once cleaned out the data i seperated the given training data set into 2 by the classe variable into 70% of all train data into a training set and the other 30% into the test set.
+
 ```{r separating training-set into 2}
+library(caret)
 intrain <- createDataPartition(y=data$classe, p=0.7, list=FALSE)
 training_data <- data[intrain,]
 test_data <- data[-intrain,]
 
 ```
 
+# Making first model with a Tree model
+Here I started modeling with a tree approach with 5 splits and give out a nice plot of the tree. Unfortunatly the accuracy of the model is very low so this model isnt right for the given data.
 ```{r make Tree and graph it}
 library(caret)
 set.seed(10)
@@ -81,29 +94,29 @@ model <- train(classe ~ ., method="rpart", data=training_data)
 
 library(rattle)
 fancyRpartPlot(model$finalModel)
-```
 
-```{r predict with tree model}
 #predict it
 prediction <- predict(model, newdata=test_data)
 
 #calculate missclassification
 xtab <- table(prediction, test_data$classe)
-
 confusionMatrix(xtab)
 ```
 
+#Making second model with random forest
+The random forest model i used was basically with the standard settings of the program showing the most important variables of the model. You can See that the first 30 variables are the most important ones for the random forest model. 
+The accuracy of the model is above 99% percent so this is a pretty accurate model. 
+
+For the future I could tweak the model a little bit further to exclude more variables to get an easier model with less variables included.
+
 ```{r model with random forest}
 library(caret)
+library(rattle)
+library(randomForest)
 set.seed(10)
-trControl = trainControl(method = "cv", number = 4, allowParallel = TRUE,verboseIter = TRUE)
-model <- train(classe ~ ., method="rf", traincontrol = trControl, importance=TRUE, data=training_data)
-
-#obove is to slow
-
 model <- randomForest(classe ~ ., importance = TRUE, data = training_data)
 varImpPlot(model, scale=TRUE)
-
+plot(model, legend=TRUE)
 #prediction
 prediction <- predict(model, newdata=test_data)
 
@@ -112,19 +125,14 @@ xtab <- table(prediction, test_data$classe)
 confusionMatrix(xtab)
 ```
 
-```{r getting most important variables}
-
-```
-plot(model, legend=TRUE)
-varImpPlot(model, sort=TRUE, n.var=52)$
-
-```{r make predictions for real test data}
+```{r make predictions for real test data, echo=FALSE}
+#just the calculation to submit the results
 prediction <- predict(model, newdata=data_test)
-```
 answers <- c("B", "A", "B", "A", "A", "E","D","B","A","A","B","C","B","A","E","E","A","B","B","B")
+```
 
-```{r write submission files}
-
+```{r write submission files, echo=FALSE}
+#Just a function for writing the output
 pml_write_files = function(x){
   n = length(x)
   for(i in 1:n){
@@ -133,7 +141,4 @@ pml_write_files = function(x){
   }
 }
 pml_write_files(answers)
-
 ```
-
-
