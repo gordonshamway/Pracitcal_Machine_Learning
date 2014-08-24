@@ -22,6 +22,8 @@ The variables in the dataset consists on different datatypes as factors, numeric
 ```{r 1. Download the Datasets}
 library(RCurl)
 
+#Windows specific workaround
+options(RCurlOptions = list(cainfo = system.file("CurlSSL", "cacert.pem", package = "RCurl")))
 #Training data
 url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
 website <- getURL(url)
@@ -64,7 +66,7 @@ temp_test <- test[, !y]
 data <- temp[, 8:60]
 data_test <- temp_test[, 8:60]
 ```
-
+library(caret)
 ```{r separating training-set into 2}
 intrain <- createDataPartition(y=data$classe, p=0.7, list=FALSE)
 training_data <- data[intrain,]
@@ -94,7 +96,13 @@ confusionMatrix(xtab)
 ```{r model with random forest}
 library(caret)
 set.seed(10)
-model <- train(classe ~ ., method="rf", importance=TRUE, data=training_data)
+trControl = trainControl(method = "cv", number = 4, allowParallel = TRUE,verboseIter = TRUE)
+model <- train(classe ~ ., method="rf", traincontrol = trControl, importance=TRUE, data=training_data)
+
+#obove is to slow
+
+model <- randomForest(classe ~ ., importance = TRUE, data = training_data)
+varImpPlot(model, scale=TRUE)
 
 #prediction
 prediction <- predict(model, newdata=test_data)
@@ -103,6 +111,12 @@ prediction <- predict(model, newdata=test_data)
 xtab <- table(prediction, test_data$classe)
 confusionMatrix(xtab)
 ```
+
+vars <- varImp(model)
+varImpPlot(model)
+
+
+varImp(model)
 
 
 You can also embed plots, for example:
