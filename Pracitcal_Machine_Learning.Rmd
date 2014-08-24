@@ -1,0 +1,114 @@
+---
+title: "Weight Lifting Exercise"
+author: "Stefan Buchholz"
+date: "10. August 2014"
+output: html_document
+---
+
+#Task-Description
+In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset). 
+The aim is to predict the outcome of "classe"-variable with the given variables in the training-dataset.
+
+#Index:
+1. Getting Data
+2. Data Exploration
+
+#Dataset-Description
+The dataset that as downloaded on 08th of August 2014 from the following link: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv> describes weight lifting exercises from 6 people. The Dataset contains 19622 observations of 160 variables where the last feature "classes" is an indicator how correct the exercise was done.
+
+The variables in the dataset consists on different datatypes as factors, numerical and integer values. The ranges of the last types are in a negative through a postive range with a lot of NA values.
+
+
+```{r 1. Download the Datasets}
+library(RCurl)
+
+#Training data
+url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+website <- getURL(url)
+raw_dataset <- read.csv(text = website)
+
+#test data
+url_test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+website <- getURL(url_test)
+test <- read.csv(text = website)
+
+#converting columns in testdata
+for(i in seq_along(test[,5:159])) {
+  test[,i] <- as.numeric(test[,i])
+}
+```
+
+```{r 2. Data Exploring}
+dim(raw_dataset)
+colnames(raw_dataset)
+summary(raw_dataset)
+str(raw_dataset)
+head(raw_dataset)
+```
+
+```{r exclude mostly NA columns}
+# convert columns to get correct NA values
+for(i in seq_along(raw_dataset[,5:159])) {
+  raw_dataset[,i] <- as.numeric(raw_dataset[,i])
+}
+y <- NULL
+for(i in seq_along(test)) {
+  y <- c(y,sum(is.na(test[,i])) > 0)
+}
+
+#exclude columns where NAs included
+temp <- raw_dataset[,!y]
+temp_test <- test[, !y]
+
+#now exclude what doesnt work
+data <- temp[, 8:60]
+data_test <- temp_test[, 8:60]
+```
+
+```{r separating training-set into 2}
+intrain <- createDataPartition(y=data$classe, p=0.7, list=FALSE)
+training_data <- data[intrain,]
+test_data <- data[-intrain,]
+
+```
+
+```{r make Tree and graph it}
+library(caret)
+set.seed(10)
+model <- train(classe ~ ., method="rpart", data=training_data)
+
+library(rattle)
+fancyRpartPlot(model$finalModel)
+```
+
+```{r predict with tree model}
+#predict it
+prediction <- predict(model, newdata=test_data)
+
+#calculate missclassification
+xtab <- table(prediction, test_data$classe)
+
+confusionMatrix(xtab)
+```
+
+```{r model with random forest}
+library(caret)
+set.seed(10)
+model <- train(classe ~ ., method="rf", importance=TRUE, data=training_data)
+
+#prediction
+prediction <- predict(model, newdata=test_data)
+
+#calculate missclassification
+xtab <- table(prediction, test_data$classe)
+confusionMatrix(xtab)
+```
+
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
